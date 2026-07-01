@@ -74,29 +74,66 @@ class LxmlParser:
                 context={"content_type": content_type, "error_type": type(e).__name__},
             ) from e
 
-    def css(self, doc: Any, selector: str) -> list[Any]:
+    def css(self, doc: Any, selector: str) -> Any | None:
         """
-        Select elements using CSS selector.
+        Select single element using CSS selector.
 
         Args:
             doc: Parsed lxml document.
             selector: CSS selector string.
 
         Returns:
-            List of matched lxml elements.
+            First matched lxml element or None if no matches.
 
         Raises:
-            SelectorError: If selector is invalid or no matches found.
+            SelectorError: If selector is invalid.
         """
         try:
             # Use cssselect for CSS selector support
-            from cssselect import GenericTranslator, SelectorError as CssSelectError
+            from cssselect import GenericTranslator, SelectorError
+
+            translator = GenericTranslator()
+            xpath_expr = translator.css_to_xpath(selector)
+            results = doc.xpath(xpath_expr)
+            return results[0] if results else None
+
+        except SelectorError as e:
+            logger.warning("Invalid CSS selector", selector=selector, error=str(e))
+            raise SelectorError(
+                f"Invalid CSS selector: {selector}",
+                context={"selector": selector},
+            ) from e
+
+        except Exception as e:
+            logger.error("CSS selection failed", selector=selector, error=str(e))
+            raise SelectorError(
+                f"CSS selection failed: {str(e)}",
+                context={"selector": selector},
+            ) from e
+
+    def css_all(self, doc: Any, selector: str) -> list[Any]:
+        """
+        Select all elements using CSS selector.
+
+        Args:
+            doc: Parsed lxml document.
+            selector: CSS selector string.
+
+        Returns:
+            List of matched lxml elements (empty list if no matches).
+
+        Raises:
+            SelectorError: If selector is invalid.
+        """
+        try:
+            # Use cssselect for CSS selector support
+            from cssselect import GenericTranslator, SelectorError
 
             translator = GenericTranslator()
             xpath_expr = translator.css_to_xpath(selector)
             return doc.xpath(xpath_expr)
 
-        except CssSelectError as e:
+        except SelectorError as e:
             logger.warning("Invalid CSS selector", selector=selector, error=str(e))
             raise SelectorError(
                 f"Invalid CSS selector: {selector}",
@@ -216,20 +253,22 @@ class BeautifulSoupParser:
 
         return BeautifulSoup(content, self.parser_backend)
 
-    def css(self, doc: Any, selector: str) -> list[Any]:
-        """
-        Select elements using CSS selector.
-
-        Args:
-            doc: BeautifulSoup document.
-            selector: CSS selector string.
-
-        Returns:
-            List of matched Tag elements.
-        """
+    def css(self, doc: Any, selector: str) -> Any | None:
+        """Select single element using CSS selector with BeautifulSoup."""
         try:
             results = doc.select(selector)
-            return results
+            return results[0] if results else None
+        except Exception as e:
+            logger.error("CSS selection failed", selector=selector, error=str(e))
+            raise SelectorError(
+                f"CSS selection failed: {str(e)}",
+                context={"selector": selector},
+            ) from e
+
+    def css_all(self, doc: Any, selector: str) -> list[Any]:
+        """Select all elements using CSS selector with BeautifulSoup."""
+        try:
+            return doc.select(selector)
         except Exception as e:
             logger.error("CSS selection failed", selector=selector, error=str(e))
             raise SelectorError(
@@ -328,11 +367,17 @@ class HybridParser:
 
         return self.bs4_parser.parse(content, content_type)
 
-    def css(self, doc: Any, selector: str) -> list[Any]:
-        """Select elements using CSS selector."""
+    def css(self, doc: Any, selector: str) -> Any | None:
+        """Select single element using CSS selector with automatic backend detection."""
         if isinstance(doc, BeautifulSoup):
             return self.bs4_parser.css(doc, selector)
         return self.lxml_parser.css(doc, selector)
+
+    def css_all(self, doc: Any, selector: str) -> list[Any]:
+        """Select all elements using CSS selector with automatic backend detection."""
+        if isinstance(doc, BeautifulSoup):
+            return self.bs4_parser.css_all(doc, selector)
+        return self.lxml_parser.css_all(doc, selector)
 
     def xpath(self, doc: Any, selector: str) -> list[Any]:
         """Select elements using XPath."""
