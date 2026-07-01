@@ -64,9 +64,23 @@ class ParseError(ScrapingError):
 class SelectorError(ParseError):
     """Raised when a selector fails to match or is invalid."""
 
+    def __init__(
+        self,
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, context)
+
 
 class ContentError(ParseError):
     """Raised when content cannot be parsed due to format issues."""
+
+    def __init__(
+        self,
+        message: str,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, context)
 
 
 class StorageError(ScrapingError):

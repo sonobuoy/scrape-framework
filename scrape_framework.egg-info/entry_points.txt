@@ -1,0 +1,2 @@
+[console_scripts]
+scrape-cli = src.main:main

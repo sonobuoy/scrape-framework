@@ -1,0 +1,323 @@
+Metadata-Version: 2.4
+Name: scrape-framework
+Version: 0.1.0
+Summary: A modular, scalable, and production-ready web scraping framework
+Author-email: Tech Lead <techlead@example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/example/scrape-framework
+Project-URL: Documentation, https://github.com/example/scrape-framework/docs
+Project-URL: Repository, https://github.com/example/scrape-framework
+Keywords: web scraping,crawler,async,http,parser
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Internet :: WWW/HTTP
+Classifier: Topic :: Software Development :: Libraries :: Application Frameworks
+Classifier: Typing :: Typed
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: httpx[http2]>=0.27.0
+Requires-Dist: lxml>=5.0.0
+Requires-Dist: beautifulsoup4>=4.12.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: pydantic-settings>=2.0.0
+Requires-Dist: structlog>=24.0.0
+Requires-Dist: sqlalchemy>=2.0.0
+Requires-Dist: aiosqlite>=0.19.0
+Requires-Dist: PyYAML>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: mypy>=1.8.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: pre-commit>=3.6.0; extra == "dev"
+Requires-Dist: types-PyYAML>=6.0.0; extra == "dev"
+Provides-Extra: browser
+Requires-Dist: playwright>=1.40.0; extra == "browser"
+
+# Scrape Framework
+
+A **modular, scalable, and production-ready** web scraping framework built with Python 3.10+ and asyncio.
+
+## Features
+
+- 🚀 **Async-first Architecture**: Built on asyncio for high-performance concurrent scraping
+- 🔌 **Modular Design**: Clean separation of concerns following Clean Architecture principles
+- 🛡️ **Robust Error Handling**: Circuit breakers, retry logic with exponential backoff, and comprehensive exception hierarchy
+- ⚙️ **Configurable**: YAML configuration with environment variable overrides via Pydantic
+- 📦 **Multiple Storage Backends**: JSON, CSV, and SQLite support out of the box
+- 🔄 **Middleware System**: Extensible middleware for user-agent rotation, proxy support, and more
+- 📊 **Structured Logging**: Professional logging with structlog (console, JSON, or structured formats)
+- 🧪 **Test-Ready**: Designed for testability with dependency injection and interface-based design
+- 📝 **Type-Safe**: Full type hints with mypy strict mode validation
+
+## Installation
+
+### Prerequisites
+
+- Python 3.10 or higher
+- pip or poetry
+
+### Install from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/example/scrape-framework.git
+cd scrape-framework
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -e ".[dev]"
+
+# Install pre-commit hooks
+pre-commit install
+```
+
+### Install as Package
+
+```bash
+pip install scrape-framework
+```
+
+## Quick Start
+
+### Running a Spider
+
+```bash
+# List available spiders
+scrape-cli list
+
+# Run the example book spider
+scrape-cli run book
+
+# Run with custom settings
+scrape-cli run book --concurrency 5 --storage csv --log-level DEBUG
+```
+
+### Creating a Custom Spider
+
+```python
+from src.scrapers.base_spider import Spider
+from src.core.interfaces import Item, Request, Response
+from src.infrastructure.parser import HybridParser
+
+
+class MySpider(Spider):
+    name = "my_spider"
+    start_urls = ["https://example.com"]
+    allowed_domains = ["example.com"]
+
+    def parse(self, response: Response):
+        parser = HybridParser()
+        doc = parser.parse(response.text)
+
+        # Extract data
+        titles = parser.css(doc, "h1.title")
+        for title in titles:
+            item = Item()
+            item["title"] = parser.extract_text(title)
+            item["url"] = response.url
+            yield item
+
+        # Follow links
+        links = parser.css(doc, "a.next-page")
+        for link in links:
+            next_url = parser.extract_attr(link, "href")
+            if next_url:
+                yield Request(url=next_url, callback="parse")
+```
+
+## Project Structure
+
+```
+scrape_framework/
+├── config/                 # Configuration files
+│   └── default.yaml       # Default settings
+├── src/
+│   ├── core/              # Core framework (business logic)
+│   │   ├── config.py      # Configuration management
+│   │   ├── exceptions.py  # Exception hierarchy
+│   │   ├── interfaces.py  # Abstract base classes
+│   │   └── pipeline.py    # Pipeline engine
+│   ├── infrastructure/    # Technical implementations
+│   │   ├── http_client.py # HTTP downloader (httpx)
+│   │   ├── parser.py      # HTML parsers (lxml/bs4)
+│   │   ├── storage.py     # Storage backends
+│   │   └── logger.py      # Logging setup
+│   ├── middleware/        # Request/response middlewares
+│   ├── scrapers/          # Spider implementations
+│   └── main.py            # CLI entry point
+├── tests/                 # Test suite
+├── docs/                  # Documentation
+└── pyproject.toml         # Project configuration
+```
+
+## Configuration
+
+Configuration can be set via:
+1. **YAML file** (default: `config/default.yaml`)
+2. **Environment variables** (prefix: `SCRAPER_`)
+3. **CLI arguments** (highest priority)
+
+### Example Configuration
+
+```yaml
+# config/default.yaml
+concurrency: 10
+user_agent_pool:
+  - "Mozilla/5.0 ..."
+  
+retry:
+  max_retries: 3
+  backoff_factor: 2.0
+
+timeout:
+  read_timeout: 30.0
+
+storage:
+  type: json
+  output_dir: ./output
+
+logging:
+  level: INFO
+  format_type: console
+```
+
+### Environment Variables
+
+```bash
+export SCRAPER_CONCURRENCY=20
+export SCRAPER__RETRY__MAX_RETRIES=5
+export SCRAPER__STORAGE__TYPE=sqlite
+```
+
+## Architecture
+
+The framework follows **Clean Architecture** principles:
+
+- **Core Layer**: Business logic, interfaces, and models (no external dependencies)
+- **Infrastructure Layer**: Implementations of interfaces (httpx, lxml, etc.)
+- **Middleware Layer**: Cross-cutting concerns (retry, auth, rotation)
+- **Application Layer**: Spider implementations and orchestration
+
+### Key Components
+
+1. **ScraperEngine**: Orchestrates the scraping pipeline
+2. **IDownloader**: HTTP client interface (implemented by HttpxDownloader)
+3. **IParser**: Parser interface (implemented by LxmlParser, BeautifulSoupParser)
+4. **IStorage**: Storage interface (implemented by JsonStorage, CsvStorage, SqliteStorage)
+5. **ISpider**: Base class for custom scrapers
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_core.py
+```
+
+### Code Quality
+
+```bash
+# Format code
+ruff format .
+
+# Lint code
+ruff check .
+
+# Type checking
+mypy src
+
+# Pre-commit checks
+pre-commit run --all-files
+```
+
+## Error Handling
+
+The framework provides a comprehensive exception hierarchy:
+
+- `ScrapingError`: Base exception
+  - `DownloadError`: HTTP request failures
+    - `DownloadTimeout`: Request timeout
+    - `HTTPError`: Non-2xx status codes
+    - `ConnectionError`: Connection failures
+  - `ParseError`: Content parsing failures
+    - `SelectorError`: Invalid CSS/XPath selectors
+    - `ContentError`: Malformed content
+  - `StorageError`: Storage backend failures
+  - `RetryError`: Max retries exceeded
+  - `CircuitBreakerError`: Circuit breaker open
+
+## Roadmap
+
+### Phase 1 (Current) ✅
+- [x] Core architecture and interfaces
+- [x] Async HTTP client with httpx
+- [x] HTML parsing with lxml/BeautifulSoup
+- [x] Storage backends (JSON, CSV, SQLite)
+- [x] Configuration management
+- [x] Basic middleware system
+- [x] CLI interface
+
+### Phase 2 (Planned)
+- [ ] Browser automation (Playwright integration)
+- [ ] Distributed scraping support (Redis queue)
+- [ ] Advanced anti-bot handling
+- [ ] Real-time monitoring dashboard
+- [ ] Job scheduling system
+- [ ] REST API for remote control
+
+### Phase 3 (Future)
+- [ ] ML-powered selector detection
+- [ ] Automatic CAPTCHA solving integration
+- [ ] Cloud deployment templates (Docker, Kubernetes)
+- [ ] Data quality validation pipeline
+- [ ] Web UI for spider management
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Guidelines
+
+- Follow PEP 8 and project style guide
+- Write tests for new features
+- Update documentation
+- Use type hints for all functions
+- Keep PRs focused and small
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Disclaimer
+
+This framework is intended for ethical and legal web scraping only. Always:
+- Respect `robots.txt` files
+- Comply with website terms of service
+- Implement appropriate rate limiting
+- Consider copyright and data protection laws
+
+---
+
+**Built with ❤️ using modern Python practices**
