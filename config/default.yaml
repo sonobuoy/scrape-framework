@@ -1,0 +1,65 @@
+# Default Configuration
+# Copy this file and modify as needed
+
+# General Settings
+concurrency: 10
+respect_robots_txt: false
+follow_redirects: true
+max_redirects: 10
+
+# User Agent Pool
+user_agent_pool:
+  - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  - "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0"
+  - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15"
+
+# Retry Settings
+retry:
+  max_retries: 3
+  backoff_factor: 2.0
+  retry_status_codes:
+    - 429
+    - 500
+    - 502
+    - 503
+    - 504
+  retry_timeout: 30.0
+
+# Timeout Settings
+timeout:
+  connect_timeout: 10.0
+  read_timeout: 30.0
+  write_timeout: 10.0
+  pool_timeout: 5.0
+
+# Rate Limiting
+rate_limit:
+  requests_per_second: 1.0
+  random_delay_range:
+    - 0.1
+    - 0.5
+  per_domain_limit: true
+
+# Storage Settings
+storage:
+  type: json  # Options: json, csv, sqlite
+  output_dir: ./output
+  batch_size: 100
+  # database_url: sqlite:///./output/scraped_data.db  # For SQLite
+
+# Logging Settings
+logging:
+  level: INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format_type: console  # Options: console, json, structured
+  # log_file: ./logs/scrapper.log
+  rotate_max_bytes: 10485760  # 10MB
+  rotate_backup_count: 5
+
+# Proxy Settings (optional)
+proxy_rotation: false
+# proxy_list:
+#   - "http://proxy1.example.com:8080"
+#   - "http://proxy2.example.com:8080"
+#   - "http://username:password@proxy3.example.com:8080"
