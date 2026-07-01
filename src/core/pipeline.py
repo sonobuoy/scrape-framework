@@ -335,25 +335,46 @@ class ScraperEngine:
             return items
 
         # Get callback method from spider
-        callback_method = getattr(spider, response.request.callback if response.request else "parse", None)
+        callback_name = response.request.callback if response.request else "parse"
+        callback_method = getattr(spider, callback_name, None)
         if not callback_method:
-            logger.error("Callback method not found", callback=response.request.callback if response.request else "parse")
+            logger.error("Callback method not found", callback=callback_name)
             return items
 
         # Parse HTML
         doc = self.parser.parse(response.text)
 
-        # Call spider's callback method
+        # Call spider's callback method (support sync, async, and async generator)
         try:
-            results = callback_method(response)
-            if results:
-                for result in results:
+            import inspect
+            if inspect.isasyncgenfunction(callback_method):
+                # Handle async generator (most common for spiders)
+                async for result in callback_method(response):
                     if isinstance(result, Item):
                         items.append(result)
                     elif isinstance(result, Request):
                         self.queue.add_request(result)
+            elif inspect.iscoroutinefunction(callback_method):
+                # Handle async function that returns a list/generator
+                results = await callback_method(response)
+                if results:
+                    for result in results:
+                        if isinstance(result, Item):
+                            items.append(result)
+                        elif isinstance(result, Request):
+                            self.queue.add_request(result)
+            else:
+                # Handle sync generator or function
+                results = callback_method(response)
+                if results:
+                    for result in results:
+                        if isinstance(result, Item):
+                            items.append(result)
+                        elif isinstance(result, Request):
+                            self.queue.add_request(result)
         except Exception as e:
             logger.exception("Error in spider callback", error=str(e))
+            raise
 
         return items
 

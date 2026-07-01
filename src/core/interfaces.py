@@ -12,6 +12,28 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 
+class _SelectorResult:
+    """Helper class to mimic Scrapy's selector result behavior."""
+    
+    def __init__(self, data: Any) -> None:
+        self._data = data
+    
+    def get(self, default: Any = None) -> Any:
+        """Get first element or default."""
+        if isinstance(self._data, list):
+            return self._data[0] if self._data else default
+        return self._data if self._data is not None else default
+    
+    def getall(self) -> list[Any]:
+        """Get all elements as list."""
+        if isinstance(self._data, list):
+            return self._data
+        return [self._data] if self._data is not None else []
+    
+    def __bool__(self) -> bool:
+        return bool(self._data)
+
+
 @dataclass
 class Request:
     """Represents an HTTP request to be processed by the scraper."""
@@ -46,6 +68,11 @@ class Response:
     request: Request | None = None
     elapsed_ms: float = 0.0
     encoding: str = "utf-8"
+    _parser: Any = field(default=None, repr=False, init=False)
+
+    def set_parser(self, parser: Any) -> None:
+        """Set parser instance for CSS/XPath methods."""
+        self._parser = parser
 
     @property
     def text(self) -> str:
@@ -62,24 +89,88 @@ class Response:
         """Check if response is a redirect."""
         return 300 <= self.status_code < 400
 
+    def css(self, selector: str) -> Any:
+        """
+        Select elements using CSS selector.
+        
+        Args:
+            selector: CSS selector string (supports Scrapy-style like 'h1::text').
+            
+        Returns:
+            SelectorResult object for chaining.
+        """
+        # Use BeautifulSoup for better Scrapy-style selector support
+        from bs4 import BeautifulSoup
+        
+        soup = BeautifulSoup(self.text, 'html.parser')
+        
+        # Handle Scrapy-style pseudo-elements
+        if '::' in selector:
+            base_selector, pseudo = selector.split('::', 1)
+            elements = soup.select(base_selector)
+            
+            if pseudo == 'text':
+                # Return text content
+                texts = [elem.get_text(strip=True) for elem in elements if elem.get_text(strip=True)]
+                return _SelectorResult(texts if len(texts) > 1 else texts[0] if texts else None)
+            elif pseudo == 'attr':
+                # For attr() we need to parse further
+                return _SelectorResult(elements)
+            else:
+                return _SelectorResult(elements)
+        else:
+            elements = soup.select(selector)
+            return _SelectorResult(elements)
+
+    def xpath(self, query: str) -> Any:
+        """
+        Select elements using XPath query.
+        
+        Args:
+            query: XPath query string.
+            
+        Returns:
+            SelectorResult object for chaining.
+        """
+        from lxml import html as lh
+        
+        doc = lh.fromstring(self.text.encode('utf-8'))
+        results = doc.xpath(query)
+        return _SelectorResult(results)
+
 
 @dataclass
 class Item:
     """Base class for scraped data items."""
 
+    data: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(self, data: dict[str, Any] | None = None) -> None:
+        self.data = data or {}
+
     def to_dict(self) -> dict[str, Any]:
         """Convert item to dictionary."""
-        return {
-            key: value
-            for key, value in self.__dict__.items()
-            if not key.startswith("_")
-        }
+        return self.data.copy()
 
     def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
+        return self.data.get(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        setattr(self, key, value)
+        self.data[key] = value
+    
+    def __getattr__(self, key: str) -> Any:
+        """Allow attribute-style access to data keys."""
+        try:
+            return self.data[key]
+        except KeyError:
+            raise AttributeError(f"'Item' object has no attribute '{key}'") from None
+    
+    def __setattr__(self, key: str, value: Any) -> None:
+        """Allow attribute-style setting of data keys."""
+        if key == "data":
+            super().__setattr__(key, value)
+        else:
+            self.data[key] = value
 
 
 class IDownloader(Protocol):
