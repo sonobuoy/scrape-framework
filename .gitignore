@@ -1,10 +1,41 @@
 ```
-# Coverage reports
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage
 .coverage
 
-# Python package artifacts
-*.egg-info/
+# Environment
+.env
+.env.local
+*.env.*
 
-# Test files
-.tests/
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/
+
+# Dependencies
+.venv/
+venv/
+node_modules/
+
+# Build artifacts
+dist/
+build/
+target/
+
+# OS specific
+.DS_Store
+Thumbs.db
 ```
